@@ -91,7 +91,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.o`
@@ -462,6 +462,97 @@ require('lazy').setup({
     end,
   },
 
+  -- MY PLUGINS
+  {
+    'sphamba/smear-cursor.nvim',
+    opts = {
+      stiffness = 0.8,
+      trailing_stiffness = 0.5,
+      distance_stop_animation = 0.5,
+    },
+  },
+  {
+    'bngarren/checkmate.nvim',
+    ft = 'markdown', -- Lazy loads for Markdown files matching patterns in 'files'
+    opts = {
+      -- your configuration here
+      -- or leave empty to use defaults
+    },
+  },
+  {
+    'tris203/precognition.nvim',
+    --event = "VeryLazy",
+    opts = {
+      -- startVisible = true,
+      -- showBlankVirtLine = true,
+      -- highlightColor = { link = "Comment" },
+      -- hints = {
+      --      Caret = { text = "^", prio = 2 },
+      --      Dollar = { text = "$", prio = 1 },
+      --      MatchingPair = { text = "%", prio = 5 },
+      --      Zero = { text = "0", prio = 1 },
+      --      w = { text = "w", prio = 10 },
+      --      b = { text = "b", prio = 9 },
+      --      e = { text = "e", prio = 8 },
+      --      W = { text = "W", prio = 7 },
+      --      B = { text = "B", prio = 6 },
+      --      E = { text = "E", prio = 5 },
+      -- },
+      -- gutterHints = {
+      --     G = { text = "G", prio = 10 },
+      --     gg = { text = "gg", prio = 9 },
+      --     PrevParagraph = { text = "{", prio = 8 },
+      --     NextParagraph = { text = "}", prio = 8 },
+      -- },
+      -- disabled_fts = {
+      --     "startify",
+      -- },
+    },
+  },
+  {
+    'nvimtools/none-ls.nvim',
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+      'nvimtools/none-ls-extras.nvim', -- gives us eslint_d
+    },
+    config = function()
+      local null_ls = require 'null-ls'
+
+      -- import eslint_d builtins from none-ls-extras
+      local eslint = require 'none-ls.diagnostics.eslint_d'
+      local eslint_format = require 'none-ls.formatting.eslint_d'
+      local eslint_actions = require 'none-ls.code_actions.eslint_d'
+
+      local augroup = vim.api.nvim_create_augroup('LspFormatting', {})
+
+      null_ls.setup {
+        sources = {
+          eslint.with { disabled_filetypes = { 'jsonc', 'markdown' } }, -- diagnostics
+          eslint_format.with { disabled_filetypes = { 'jsonc', 'markdown' } }, -- formatting
+          eslint_actions.with { disabled_filetypes = { 'jsonc', 'markdown' } }, -- code actions
+          null_ls.builtins.formatting.prettier.with {
+            disabled_filetypes = { 'jsonc', 'markdown' },
+          },
+        },
+        on_attach = function(client, bufnr)
+          if client.supports_method 'textDocument/formatting' then
+            vim.api.nvim_clear_autocmds { group = augroup, buffer = bufnr }
+            vim.api.nvim_create_autocmd('BufWritePre', {
+              group = augroup,
+              buffer = bufnr,
+              callback = function()
+                vim.lsp.buf.format { bufnr = bufnr }
+              end,
+            })
+          end
+        end,
+      }
+    end,
+  },
+  {
+    'giusgad/pets.nvim',
+    dependencies = { 'MunifTanjim/nui.nvim', 'giusgad/hologram.nvim' },
+  },
   -- LSP Plugins
   {
     -- `lazydev` configures Lua LSP for your Neovim config, runtime and plugins
@@ -474,6 +565,17 @@ require('lazy').setup({
         { path = '${3rd}/luv/library', words = { 'vim%.uv' } },
       },
     },
+  },
+  {
+    'nvim-orgmode/orgmode',
+    event = 'VeryLazy',
+    config = function()
+      -- Setup orgmode
+      require('orgmode').setup {
+        org_agenda_files = '~/org/**/*',
+        org_default_notes_file = '~/org/refile.org',
+      }
+    end,
   },
   {
     -- Main LSP Configuration
@@ -989,6 +1091,7 @@ require('lazy').setup({
   -- For additional information with loading, sourcing and examples see `:help lazy.nvim-🔌-plugin-spec`
   -- Or use telescope!
   -- In normal mode type `<space>sh` then write `lazy.nvim-plugin`
+  { 'AlphaTechnolog/pywal.nvim', as = 'pywal' },
   -- you can continue same window with `<space>sr` which resumes last telescope search
 }, {
   ui = {
@@ -1012,5 +1115,33 @@ require('lazy').setup({
   },
 })
 
+local pywal = require 'pywal'
+
+pywal.setup()
+
+vim.opt.tabstop = 2
+vim.opt.softtabstop = 2
+vim.opt.shiftwidth = 2
+vim.opt.expandtab = true
+vim.opt.autoindent = true
+vim.opt.smartindent = true
+
+local formatgrp = vim.api.nvim_create_augroup('C_format_42', {})
+
+-- vim.api.nvim_create_autocmd('BufWritePre', {
+--   command = 'CFormat42',
+--   group = formatgrp,
+-- })
+
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
+--
+---- Set 4 spaces for C and C++ files
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = { 'cpp', 'c', 'h', 'hpp', 'cuda' },
+  callback = function()
+    vim.opt_local.shiftwidth = 4
+    vim.opt_local.tabstop = 4
+    vim.opt_local.expandtab = true -- if you want spaces instead of tabs
+  end,
+})
