@@ -464,6 +464,15 @@ require('lazy').setup({
 
   -- MY PLUGINS
   {
+    'MeanderingProgrammer/render-markdown.nvim',
+    dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-mini/mini.nvim' }, -- if you use the mini.nvim suite
+    -- dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-mini/mini.icons' },        -- if you use standalone mini plugins
+    -- dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-tree/nvim-web-devicons' }, -- if you prefer nvim-web-devicons
+    ---@module 'render-markdown'
+    ---@type render.md.UserConfig
+    opts = {},
+  },
+  {
     'sphamba/smear-cursor.nvim',
     opts = {
       stiffness = 0.8,
@@ -472,17 +481,237 @@ require('lazy').setup({
     },
   },
   {
-    'bngarren/checkmate.nvim',
-    ft = 'markdown', -- Lazy loads for Markdown files matching patterns in 'files'
-    opts = {
-      -- your configuration here
-      -- or leave empty to use defaults
+    'coder/claudecode.nvim',
+    dependencies = { 'folke/snacks.nvim' },
+    config = true,
+    -- `cmd` lets lazy.nvim create command stubs that load the plugin on first use,
+    -- so `:ClaudeCode` and friends work on a fresh start. Without it, a keys-only
+    -- spec defers loading until a <leader>a* mapping is pressed and the commands
+    -- would not exist yet.
+    cmd = {
+      'ClaudeCode',
+      'ClaudeCodeFocus',
+      'ClaudeCodeSelectModel',
+      'ClaudeCodeAdd',
+      'ClaudeCodeSend',
+      'ClaudeCodeTreeAdd',
+      'ClaudeCodeStatus',
+      'ClaudeCodeStart',
+      'ClaudeCodeStop',
+      'ClaudeCodeOpen',
+      'ClaudeCodeClose',
+      'ClaudeCodeDiffAccept',
+      'ClaudeCodeDiffDeny',
+      'ClaudeCodeCloseAllDiffs',
     },
+    keys = {
+      { '<leader>a', nil, desc = 'AI/Claude Code' },
+      { '<leader>ac', '<cmd>ClaudeCode<cr>', desc = 'Toggle Claude' },
+      { '<leader>af', '<cmd>ClaudeCodeFocus<cr>', desc = 'Focus Claude' },
+      { '<leader>ar', '<cmd>ClaudeCode --resume<cr>', desc = 'Resume Claude' },
+      { '<leader>aC', '<cmd>ClaudeCode --continue<cr>', desc = 'Continue Claude' },
+      { '<leader>am', '<cmd>ClaudeCodeSelectModel<cr>', desc = 'Select Claude model' },
+      { '<leader>ab', '<cmd>ClaudeCodeAdd %<cr>', desc = 'Add current buffer' },
+      { '<leader>as', '<cmd>ClaudeCodeSend<cr>', mode = 'v', desc = 'Send to Claude' },
+      {
+        '<leader>as',
+        '<cmd>ClaudeCodeTreeAdd<cr>',
+        desc = 'Add file',
+        ft = { 'NvimTree', 'neo-tree', 'oil', 'minifiles', 'netrw', 'snacks_picker_list' },
+      },
+      -- Diff management
+      { '<leader>aa', '<cmd>ClaudeCodeDiffAccept<cr>', desc = 'Accept diff' },
+      { '<leader>ad', '<cmd>ClaudeCodeDiffDeny<cr>', desc = 'Deny diff' },
+    },
+  },
+  {
+    'MagicDuck/grug-far.nvim',
+    -- Note (lazy loading): grug-far.lua defers all it's requires so it's lazy by default
+    -- additional lazy config to defer loading is not really needed...
+    config = function()
+      -- optional setup call to override plugin options
+      -- alternatively you can set options with vim.g.grug_far = { ... }
+      require('grug-far').setup {
+        -- options, see Configuration section below
+        -- there are no required options atm
+      }
+    end,
+  },
+  {
+    'folke/snacks.nvim',
+    priority = 1000,
+    lazy = false,
+    ---@type snacks.Config
+    opts = {
+      -- your configuration comes here
+      -- or leave it empty to use the default settings
+      -- refer to the configuration section below
+      bigfile = { enabled = true },
+      dashboard = { enabled = true },
+      explorer = { enabled = true },
+      indent = { enabled = true },
+      input = { enabled = true },
+      picker = { enabled = true },
+      notifier = { enabled = true },
+      quickfile = { enabled = true },
+      scope = { enabled = true },
+      scroll = { enabled = true },
+      statuscolumn = { enabled = true },
+      words = { enabled = true },
+    },
+  },
+  {
+    'mfussenegger/nvim-dap',
+    dependencies = {
+      'williamboman/mason.nvim',
+      'jay-babu/mason-nvim-dap.nvim',
+      { 'rcarriga/nvim-dap-ui', dependencies = 'nvim-neotest/nvim-nio' },
+    },
+    -- lazy-load on the keys you actually use
+    keys = {
+      {
+        '<F5>',
+        function()
+          require('dap').continue()
+        end,
+        desc = 'DAP continue',
+      },
+      {
+        '<leader>db',
+        function()
+          require('dap').toggle_breakpoint()
+        end,
+        desc = 'Toggle breakpoint',
+      },
+      {
+        '<leader>du',
+        function()
+          require('dapui').toggle()
+        end,
+        desc = 'Toggle DAP UI',
+      },
+    },
+    config = function()
+      local dap, dapui = require 'dap', require 'dapui'
+
+      require('mason-nvim-dap').setup {
+        ensure_installed = { 'js' },
+        automatic_installation = true,
+      }
+
+      -- manual adapter registration (runs after deps are loaded)
+      local js_debug = vim.fn.stdpath 'data' .. '/mason/bin/js-debug-adapter'
+      if vim.fn.has 'win32' == 1 then
+        js_debug = js_debug .. '.cmd'
+      end
+
+      dap.adapters['pwa-node'] = {
+        type = 'server',
+        host = 'localhost',
+        port = '${port}',
+        executable = { command = js_debug, args = { '${port}' } },
+      }
+
+      dap.configurations.javascript = {
+        {
+          type = 'pwa-node',
+          request = 'launch',
+          name = 'Debug current tap test file',
+          program = '${file}',
+          cwd = '${workspaceFolder}',
+          console = 'integratedTerminal',
+          sourceMaps = false, -- <-- key change: ignore the broken maps
+          skipFiles = { '<node_internals>/**' }, -- only skip Node internals
+          -- (remove resolveSourceMapLocations and smartStep — they only matter with maps on)
+        },
+      }
+
+      dapui.setup()
+      dap.listeners.before.launch.dapui_config = dapui.open
+      dap.listeners.before.attach.dapui_config = dapui.open
+
+      -- remaining (non-key-triggered) maps
+      vim.keymap.set('n', '<leader>dq', function()
+        require('dap').terminate()
+        require('dapui').close()
+      end, { desc = 'Quit DAP (terminate + close UI)' })
+      vim.keymap.set('n', '<leader>do', dap.step_over, { desc = 'Step over' })
+      vim.keymap.set('n', '<leader>di', dap.step_into, { desc = 'Step into' })
+      vim.keymap.set('n', '<leader>dg', dap.step_out, { desc = 'Step out' })
+      vim.keymap.set('n', '<leader>dc', dap.continue, { desc = 'Continue' })
+      vim.keymap.set('n', '<leader>dt', dap.terminate, { desc = 'Terminate' })
+    end,
+  },
+  {
+    'nvim-tree/nvim-web-devicons',
+    opts = {},
+  },
+  {
+    'eandrju/cellular-automaton.nvim',
+  },
+  {
+    'sindrets/diffview.nvim',
+  },
+  {
+    'nvim-orgmode/orgmode',
+    dependencies = {
+      'nvim-telescope/telescope.nvim',
+      'nvim-orgmode/telescope-orgmode.nvim',
+      'nvim-orgmode/org-bullets.nvim',
+      'danilshvalov/org-modern.nvim',
+    },
+    event = 'VeryLazy',
+    config = function()
+      local Menu = require 'org-modern.menu'
+      require('orgmode').setup {
+        org_agenda_files = '~/org/**/*',
+        org_default_notes_file = '~/org/notes.org',
+        org_todo_keywords = { 'TODO(t)', 'IN-PROGRESS(p)', '|', 'DONE(d)' },
+        ui = {
+          menu = {
+            handler = function(data)
+              Menu:new({
+                window = {
+                  margin = { 1, 0, 1, 0 },
+                  padding = { 0, 1, 0, 1 },
+                  title_pos = 'center',
+                  border = 'single',
+                  zindex = 1000,
+                },
+                icons = {
+                  separator = '➜',
+                },
+              }):open(data)
+            end,
+          },
+        },
+      }
+      require('org-bullets').setup()
+
+      require('telescope').setup()
+      require('telescope').load_extension 'orgmode'
+      vim.keymap.set('n', '<leader>r', require('telescope').extensions.orgmode.refile_heading)
+      vim.keymap.set('n', '<leader>fh', require('telescope').extensions.orgmode.search_headings)
+      vim.keymap.set('n', '<leader>li', require('telescope').extensions.orgmode.insert_link)
+    end,
+  },
+  {
+    'chipsenkbeil/org-roam.nvim',
+    dependencies = { 'nvim-orgmode/orgmode' },
+    config = function()
+      require('org-roam').setup { directory = '~/org/roam/' }
+    end,
+  },
+  {
+    'rktjmp/playtime.nvim',
   },
   {
     'tris203/precognition.nvim',
     --event = "VeryLazy",
     opts = {
+      targetedMotionHints = {
+        enabled = false,
+      },
       -- startVisible = true,
       -- showBlankVirtLine = true,
       -- highlightColor = { link = "Comment" },
@@ -510,72 +739,37 @@ require('lazy').setup({
     },
   },
   {
-    'nvimtools/none-ls.nvim',
-    dependencies = {
-      'nvim-lua/plenary.nvim',
-      'nvimtools/none-ls-extras.nvim', -- gives us eslint_d
-    },
-    config = function()
-      local null_ls = require 'null-ls'
-
-      -- import eslint_d builtins from none-ls-extras
-      local eslint = require 'none-ls.diagnostics.eslint_d'
-      local eslint_format = require 'none-ls.formatting.eslint_d'
-      local eslint_actions = require 'none-ls.code_actions.eslint_d'
-
-      local augroup = vim.api.nvim_create_augroup('LspFormatting', {})
-
-      null_ls.setup {
-        sources = {
-          eslint.with { disabled_filetypes = { 'jsonc', 'markdown' } }, -- diagnostics
-          eslint_format.with { disabled_filetypes = { 'jsonc', 'markdown' } }, -- formatting
-          eslint_actions.with { disabled_filetypes = { 'jsonc', 'markdown' } }, -- code actions
-          null_ls.builtins.formatting.prettier.with {
-            disabled_filetypes = { 'jsonc', 'markdown' },
-          },
-        },
-        on_attach = function(client, bufnr)
-          if client.supports_method 'textDocument/formatting' then
-            vim.api.nvim_clear_autocmds { group = augroup, buffer = bufnr }
-            vim.api.nvim_create_autocmd('BufWritePre', {
-              group = augroup,
-              buffer = bufnr,
-              callback = function()
-                vim.lsp.buf.format { bufnr = bufnr }
-              end,
-            })
-          end
-        end,
-      }
-    end,
-  },
-  {
-    'giusgad/pets.nvim',
-    dependencies = { 'MunifTanjim/nui.nvim', 'giusgad/hologram.nvim' },
-  },
-  -- LSP Plugins
-  {
-    -- `lazydev` configures Lua LSP for your Neovim config, runtime and plugins
-    -- used for completion, annotations and signatures of Neovim apis
-    'folke/lazydev.nvim',
-    ft = 'lua',
+    'bngarren/checkmate.nvim',
+    ft = 'markdown', -- Lazy loads for Markdown files matching patterns in 'files'
     opts = {
-      library = {
-        -- Load luvit types when the `vim.uv` word is found
-        { path = '${3rd}/luv/library', words = { 'vim%.uv' } },
-      },
+      -- your configuration here
+      -- or leave empty to use defaults
     },
   },
   {
-    'nvim-orgmode/orgmode',
+    'chrisgrieser/nvim-chainsaw',
     event = 'VeryLazy',
-    config = function()
-      -- Setup orgmode
-      require('orgmode').setup {
-        org_agenda_files = '~/org/**/*',
-        org_default_notes_file = '~/org/refile.org',
-      }
-    end,
+    opts = {}, -- required even if left empty
+  },
+  {
+    'ThePrimeagen/vim-be-good',
+  },
+  {
+    'f-person/git-blame.nvim',
+    -- load the plugin at startup
+    event = 'VeryLazy',
+    -- Because of the keys part, you will be lazy loading this plugin.
+    -- The plugin will only load once one of the keys is used.
+    -- If you want to load the plugin at startup, add something like event = "VeryLazy",
+    -- or lazy = false. One of both options will work.
+    opts = {
+      -- your configuration comes here
+      -- for example
+      enabled = false, -- if you want to enable the plugin
+      message_template = ' <summary> • <date> • <author> • <<sha>>', -- template for the blame message, check the Message template section for more options
+      date_format = '%m-%d-%Y %H:%M:%S', -- template for the date, check Date format section for more options
+      virtual_text_column = 1, -- virtual text start column, check Start virtual text at column section for more options
+    },
   },
   {
     -- Main LSP Configuration
@@ -725,6 +919,20 @@ require('lazy').setup({
               vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled { bufnr = event.buf })
             end, '[T]oggle Inlay [H]ints')
           end
+
+          -- svelte-language-server keeps its own TypeScript program for the
+          -- project. It does not notice when a plain `.js`/`.ts` file changes on
+          -- disk, so types imported into `.svelte` files go stale until you
+          -- restart the server. This tells it to re-read the file on write.
+          if client and client.name == 'svelte' then
+            vim.api.nvim_create_autocmd('BufWritePost', {
+              group = vim.api.nvim_create_augroup('kickstart-svelte-ts-refresh', { clear = true }),
+              pattern = { '*.js', '*.ts' },
+              callback = function(args)
+                client:notify('$/onDidChangeTsOrJsFile', { uri = vim.uri_from_fname(vim.fn.fnamemodify(args.file, ':p')) })
+              end,
+            })
+          end
         end,
       })
 
@@ -800,6 +1008,62 @@ require('lazy').setup({
             },
           },
         },
+
+        -- [[ SvelteKit stack ]]
+
+        -- svelte-language-server. Handles `.svelte` files end to end: template,
+        -- <script lang="ts">, and <style>. Note that `ts_ls` deliberately does
+        -- NOT attach to `.svelte` files (its default filetypes are only the
+        -- js/ts/jsx/tsx four), which is what we want -- two servers claiming the
+        -- same buffer produces duplicate diagnostics and completions.
+        svelte = {},
+
+        -- TypeScript/JavaScript for the plain `.ts` / `.js` files in your project.
+        ts_ls = {},
+
+        -- Diagnostics and `gra` code actions from your project's eslint config.
+        eslint = {
+          settings = {
+            -- Resolve the nearest eslint config rather than assuming one at the
+            -- cwd. Matters for monorepos and for SvelteKit projects where the
+            -- app lives below the repo root.
+            workingDirectories = { mode = 'auto' },
+          },
+        },
+
+        tailwindcss = {},
+
+        -- Emmet abbreviations (`div.foo>ul>li*3` then <C-y>,) in markup files.
+        emmet_language_server = {
+          filetypes = { 'html', 'css', 'svelte', 'javascriptreact', 'typescriptreact' },
+        },
+
+        cssls = {},
+        html = {},
+        jsonls = {},
+
+        -- [[ PHP / Laravel ]]
+
+        intelephense = {
+          settings = {
+            intelephense = {
+              -- Laravel's `vendor/` contains some very large single files, and
+              -- intelephense skips anything over its 1MB default. When that
+              -- happens you get phantom "undefined method" errors on facades
+              -- and Eloquent query builders. 5MB covers a normal Laravel app.
+              files = { maxSize = 5000000 },
+            },
+          },
+          -- NOTE: deliberately NOT adding `blade` to filetypes here. Blade files
+          -- are PHP-flavoured but full of `@if` / `@foreach` directives that
+          -- intelephense parses as syntax errors, so attaching it to `.blade.php`
+          -- trades a little completion for a lot of false diagnostics.
+          --
+          -- NOTE: intelephense is freemium. Completion, hover, goto-definition,
+          -- references and diagnostics are free. Rename (`grn`), find
+          -- implementations (`gri`) and code actions (`gra`) need a licence key:
+          --   vim.lsp.config('intelephense', { init_options = { licenceKey = '...' } })
+        },
       }
 
       -- Ensure the servers and tools above are installed
@@ -818,23 +1082,36 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        'prettier', -- Used to format Svelte/JS/TS/CSS/HTML/JSON
+        'pint', -- Used to format PHP (fallback when a project has no vendor/bin/pint)
+        'blade-formatter', -- Used to format Laravel Blade templates
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
       require('mason-lspconfig').setup {
         ensure_installed = {}, -- explicitly set to an empty table (Kickstart populates installs via mason-tool-installer)
-        automatic_installation = false,
-        handlers = {
-          function(server_name)
-            local server = servers[server_name] or {}
-            -- This handles overriding only values explicitly passed
-            -- by the server configuration above. Useful when disabling
-            -- certain features of an LSP (for example, turning off formatting for ts_ls)
-            server.capabilities = vim.tbl_deep_extend('force', {}, capabilities, server.capabilities or {})
-            require('lspconfig')[server_name].setup(server)
-          end,
-        },
+        -- We enable servers ourselves below, so that only the servers listed in
+        -- `servers` start, and they start with our settings attached.
+        automatic_enable = false,
       }
+
+      -- Register each server's config, then enable it.
+      --
+      -- NOTE: this replaces the old `mason-lspconfig` `handlers` +
+      -- `require('lspconfig')[name].setup()` pattern. mason-lspconfig v2 removed
+      -- the `handlers` option and nvim-lspconfig no longer ships a `lspconfig`
+      -- module, so that code silently never ran. `vim.lsp.config`/`vim.lsp.enable`
+      -- are the Neovim 0.11+ replacements. See `:help lsp-config`.
+      --
+      -- The '*' entry is merged into every server, so blink.cmp's extra
+      -- capabilities get broadcast once rather than per-server.
+      vim.lsp.config('*', { capabilities = capabilities })
+
+      for server_name, server_config in pairs(servers) do
+        vim.lsp.config(server_name, server_config)
+      end
+
+      vim.lsp.enable(vim.tbl_keys(servers))
     end,
   },
 
@@ -863,18 +1140,45 @@ require('lazy').setup({
           return nil
         else
           return {
-            timeout_ms = 500,
+            -- Raised from kickstart's 500ms default. The PHP toolchain is slow
+            -- to start: measured on this machine, `pint` takes ~485ms and
+            -- `blade-formatter` ~705ms, so 500ms aborted Blade saves every time
+            -- and PHP saves intermittently. This is a ceiling, not a delay --
+            -- fast formatters like prettier still return in ~100ms.
+            timeout_ms = 3000,
             lsp_format = 'fallback',
           }
         end
       end,
       formatters_by_ft = {
         lua = { 'stylua' },
-        -- Conform can also run multiple formatters sequentially
-        -- python = { "isort", "black" },
+
+        -- Prettier handles the whole SvelteKit surface.
         --
-        -- You can use 'stop_after_first' to run the first available formatter from the list
-        -- javascript = { "prettierd", "prettier", stop_after_first = true },
+        -- IMPORTANT: formatting `.svelte` files requires `prettier-plugin-svelte`,
+        -- which is a *project* dependency, not a global one. conform prefers a
+        -- project-local `node_modules/.bin/prettier` over the one on your PATH,
+        -- so this works inside a SvelteKit project (they ship the plugin by
+        -- default) but will fall back to your global `/usr/bin/prettier` and
+        -- leave `.svelte` files unformatted outside of one. If that bites you:
+        --   npm i -D prettier prettier-plugin-svelte
+        svelte = { 'prettier' },
+        javascript = { 'prettier' },
+        javascriptreact = { 'prettier' },
+        typescript = { 'prettier' },
+        typescriptreact = { 'prettier' },
+        css = { 'prettier' },
+        html = { 'prettier' },
+        json = { 'prettier' },
+        jsonc = { 'prettier' },
+        yaml = { 'prettier' },
+        markdown = { 'prettier' },
+
+        -- Laravel Pint. Like prettier above, conform prefers the project-local
+        -- `vendor/bin/pint` and falls back to a global `pint` on PATH, so it
+        -- picks up each project's own `pint.json` ruleset.
+        php = { 'pint' },
+        blade = { 'blade-formatter' },
       },
     },
   },
@@ -1042,28 +1346,60 @@ require('lazy').setup({
   },
   { -- Highlight, edit, and navigate code
     'nvim-treesitter/nvim-treesitter',
+    branch = 'main',
+    lazy = false,
     build = ':TSUpdate',
-    main = 'nvim-treesitter.configs', -- Sets main module to use for opts
-    -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
-    opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
-      -- Autoinstall languages that are not installed
-      auto_install = true,
-      highlight = {
-        enable = true,
-        -- Some languages depend on vim's regex highlighting system (such as Ruby) for indent rules.
-        --  If you are experiencing weird indenting issues, add the language to
-        --  the list of additional_vim_regex_highlighting and disabled languages for indent.
-        additional_vim_regex_highlighting = { 'ruby' },
-      },
-      indent = { enable = true, disable = { 'ruby' } },
-    },
-    -- There are additional nvim-treesitter modules that you can use to interact
-    -- with nvim-treesitter. You should go explore a few and see what interests you:
-    --
-    --    - Incremental selection: Included, see `:help nvim-treesitter-incremental-selection-mod`
-    --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
-    --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
+    config = function()
+      local parsers = {
+        'bash',
+        'blade', -- Laravel templates; nvim maps `*.blade.php` to the `blade` filetype
+        'c',
+        'css',
+        'diff',
+        'html',
+        'javascript',
+        'jsdoc',
+        'json',
+        'lua',
+        'luadoc',
+        'markdown',
+        'markdown_inline',
+        'php', -- pulls in `php_only` as a dependency automatically
+        'phpdoc',
+        'query',
+        'svelte',
+        'tsx',
+        'typescript',
+        'vim',
+        'vimdoc',
+        'yaml',
+      }
+
+      -- Install parsers that aren't already installed
+      local installed = require('nvim-treesitter').get_installed 'parsers'
+      local to_install = vim.tbl_filter(function(p)
+        return not vim.tbl_contains(installed, p)
+      end, parsers)
+
+      if #to_install > 0 then
+        require('nvim-treesitter').install(to_install)
+      end
+
+      -- Enable highlighting and indentation on matching filetypes
+      vim.api.nvim_create_autocmd('FileType', {
+        pattern = parsers,
+        callback = function(args)
+          -- Highlighting (replaces `highlight = { enable = true }`)
+          pcall(vim.treesitter.start)
+
+          -- Indentation (replaces `indent = { enable = true }`)
+          -- Ruby was disabled in your old config; skip it for any future additions
+          if vim.bo[args.buf].filetype ~= 'ruby' then
+            vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+          end
+        end,
+      })
+    end,
   },
 
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
